@@ -124,6 +124,40 @@ node server.js
 - System topology visualization
 - Configurable dashboards and alerting
 
+## User Interface
+
+RetailShift provides a modern, intuitive interface for monitoring and analyzing retail operations.
+
+### Main Dashboard
+
+![Dashboard Overview](docs/images/dashboard.jpg)
+
+The main dashboard provides a comprehensive overview of key metrics, real-time alerts, and system health. It combines critical information from all modules into a single pane of glass, enabling quick identification of trends and potential issues.
+
+### System Topology Visualization
+
+![System Topology](docs/images/system_topology.jpg)
+
+The interactive system topology visualization shows the connections between different services and data stores in the RetailShift ecosystem. This force-directed graph helps to understand data flow and dependencies between components, making it easier to diagnose issues and optimize system architecture.
+
+### Inventory Monitoring
+
+![Inventory Monitor](docs/images/inventory_monitor.jpg)
+
+The inventory monitoring dashboard tracks stock levels, reorder points, and inventory movements in real-time. Color-coded alerts highlight potential stockouts or overstock situations, while trend graphs help predict future inventory needs based on historical patterns.
+
+### Transaction Stream Analysis
+
+![Transaction Stream](docs/images/transaction_stream.jpg)
+
+The transaction stream analyzer visualizes sales patterns across time periods and store locations. It allows filtering by product category, payment method, and other attributes, enabling deep analysis of transaction data and identification of profitable trends or problematic areas.
+
+### Customer Insights
+
+![Customer Insights](docs/images/customer_insights.jpg)
+
+The customer insights dashboard provides detailed analytics on customer behavior, segmentation, and loyalty metrics. It helps identify high-value customers, track conversion rates, and analyze shopping patterns to inform marketing strategies and personalization efforts.
+
 ## Recent Improvements
 
 ### Code Structure Cleanup (March 2025)
