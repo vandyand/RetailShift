@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legacy-adapter
+  namespace: retailshift
+  labels:
+    app: legacy-adapter
+    part-of: retailshift
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: legacy-adapter
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: legacy-adapter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: legacy-adapter
+          image: retailshift/legacy-adapter:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: RETAILSHIFT_SERVER_PORT
+              value: "8080"
+            - name: RETAILSHIFT_MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: uri
+            - name: RETAILSHIFT_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: RETAILSHIFT_LEGACY_SYSTEM_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: legacy-pos-credentials
+                  key: jdbc-url
+            - name: RETAILSHIFT_LEGACY_SYSTEM_USER
+              valueFrom:
+                secretKeyRef:
+                  name: legacy-pos-credentials
+                  key: username
+            - name: RETAILSHIFT_LEGACY_SYSTEM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: legacy-pos-credentials
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legacy-adapter
+  namespace: retailshift
+  labels:
+    app: legacy-adapter
+spec:
+  selector:
+    app: legacy-adapter
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: legacy-adapter
+  namespace: retailshift
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  rules:
+    - host: legacy-adapter.retailshift.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: legacy-adapter
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - legacy-adapter.retailshift.example.com
+      secretName: legacy-adapter-tls
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: legacy-adapter
+  namespace: retailshift
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: legacy-adapter
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

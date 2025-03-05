@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "legacy-adapter"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["legacy-adapter:8080"]
+
+  - job_name: "kafka"
+    static_configs:
+      - targets: ["kafka:9092"]
+
+  - job_name: "mongodb"
+    static_configs:
+      - targets: ["mongodb:27017"]
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+rule_files:
+  # - "alert_rules.yml"

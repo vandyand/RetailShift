@@ -1,0 +1,54 @@
+{;; HTTP server configuration
+ :server {:port 8080
+          :host "0.0.0.0"
+          :thread-pool-size 50}
+
+ ;; MongoDB configuration
+ :mongodb {:uri "mongodb://localhost:27017/retailshift_legacy"
+           :connection-pool-size 10
+           :connect-timeout-ms 5000
+           :read-timeout-ms 10000}
+
+ ;; Kafka configuration
+ :kafka {:bootstrap-servers "localhost:9092"
+         :client-id "legacy-adapter"
+         :acks "all"
+         :retries 3
+         :max-block-ms 6000
+         :topics {:inventory "retailshift.inventory"
+                  :transactions "retailshift.transactions"
+                  :customers "retailshift.customers"
+                  :events "retailshift.events"}}
+
+ ;; Legacy POS system connection
+ :legacy-system {:type "postgres"
+                 :jdbc-url "jdbc:postgresql://localhost:5432/legacy_pos"
+                 :user "legacy_user"
+                 :password "change-me-in-env"
+                 :max-pool-size 10
+                 :connection-timeout-ms 30000}
+
+ ;; Metrics and monitoring
+ :metrics {:enabled true
+           :prometheus-endpoint "/metrics"
+           :collection-frequency-ms 60000}
+
+ ;; Tracing configuration
+ :tracing {:enabled true
+           :service-name "legacy-adapter"
+           :sampler-type "const"
+           :sampler-param 1
+           :reporter-endpoint "http://jaeger:14268/api/traces"}
+
+ ;; Security settings
+ :security {:api-key-header "X-API-Key"
+            :required-roles #{:admin :pos-operator}}
+
+ ;; Rate limiting
+ :rate-limit {:enabled true
+              :max-requests-per-minute 1000}
+
+ ;; Cache configuration
+ :cache {:type "redis"
+         :uri "redis://localhost:6379"
+         :ttl-seconds 3600}} 
