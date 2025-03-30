@@ -21,7 +21,7 @@
                  [com.github.seancorfield/next.jdbc "1.3.847"]  ; JDBC library for legacy DB connections
                  [org.postgresql/postgresql "42.5.4"]  ; PostgreSQL driver
                  [io.kubernetes/client-java "17.0.2"]  ; Kubernetes client
-                 [micrometer-registry-prometheus "1.11.0"]  ; Metrics for monitoring
+                 [io.micrometer/micrometer-registry-prometheus "1.11.0"]  ; Metrics for monitoring
                  [io.opentracing/opentracing-api "0.33.0"]  ; Distributed tracing
                  [io.jaegertracing/jaeger-client "1.8.1"]]
 

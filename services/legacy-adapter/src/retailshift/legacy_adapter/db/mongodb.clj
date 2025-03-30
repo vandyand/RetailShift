@@ -3,10 +3,13 @@
             [retailshift.legacy-adapter.config :as config]
             [monger.core :as mg]
             [monger.collection :as mc]
-            [monger.operators :refer :all]
+            [monger.operators :refer [$set]]
             [monger.query :as q]
             [mount.core :refer [defstate]])
   (:import [com.mongodb MongoClientOptions MongoClientSettings ServerAddress]))
+
+;; Define the MongoDB connection atom
+(defonce ^:private conn-state (atom nil))
 
 (defn- create-connection
   "Create a MongoDB connection"
@@ -17,9 +20,10 @@
     {:conn conn
      :db db}))
 
-(defstate connection
-  :start (create-connection)
-  :stop (when-let [conn (:conn connection)]
+;; Define the connection state using mount
+(defstate db-connection
+  :start (reset! conn-state (create-connection))
+  :stop (when-let [conn (:conn @conn-state)]
           (log/info "Closing MongoDB connection")
           (mg/disconnect conn)))
 
@@ -27,7 +31,7 @@
   "Check if MongoDB connection is healthy"
   []
   (try
-    (let [{:keys [db]} connection]
+    (let [{:keys [db]} @conn-state]
       (mc/count db "system.indexes")
       true)
     (catch Exception e
@@ -38,7 +42,7 @@
   "Find a single document by ID"
   [collection id]
   (try
-    (let [{:keys [db]} connection]
+    (let [{:keys [db]} @conn-state]
       (mc/find-map-by-id db collection id))
     (catch Exception e
       (log/error e (str "Failed to find document in " collection " with ID " id))
@@ -54,11 +58,11 @@
    (find-all collection query limit nil))
   ([collection query limit skip]
    (try
-     (let [{:keys [db]} connection
-           q (cond-> (q/find (q/collection db collection) query)
-               limit (q/limit limit)
-               skip (q/skip skip))]
-       (q/exec q))
+     (let [{:keys [db]} @conn-state]
+       (cond
+         (and limit skip) (mc/find-maps db collection query {:limit limit, :skip skip})
+         limit (mc/find-maps db collection query {:limit limit})
+         :else (mc/find-maps db collection query)))
      (catch Exception e
        (log/error e (str "Failed to find documents in " collection))
        []))))
@@ -67,7 +71,7 @@
   "Insert a document into a collection"
   [collection document]
   (try
-    (let [{:keys [db]} connection
+    (let [{:keys [db]} @conn-state
           result (mc/insert-and-return db collection document)]
       result)
     (catch Exception e
@@ -78,7 +82,7 @@
   "Update a document by ID"
   [collection id update-doc]
   (try
-    (let [{:keys [db]} connection]
+    (let [{:keys [db]} @conn-state]
       (mc/update-by-id db collection id {$set update-doc})
       (find-one collection id))
     (catch Exception e
@@ -89,7 +93,7 @@
   "Delete a document by ID"
   [collection id]
   (try
-    (let [{:keys [db]} connection]
+    (let [{:keys [db]} @conn-state]
       (mc/remove-by-id db collection id)
       true)
     (catch Exception e

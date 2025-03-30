@@ -22,8 +22,8 @@
   "Initialize all system components"
   []
   (log/info "Initializing Legacy Adapter Service")
-  (-> (mount/only #{#'config/config
-                    #'mongodb/connection
+  (-> (mount/only #{#'config/app-config
+                    #'mongodb/db-connection
                     #'legacy-client/connection
                     #'producer/kafka-producer
                     #'http-server})
@@ -75,4 +75,4 @@
   (mount/start #'http-server)
 
   ;; Check config
-  config/config) 
+  config/app-config) 

@@ -81,6 +81,10 @@ retailshift/
 │   ├── prometheus/            # Prometheus configuration
 │   └── grafana/               # Grafana dashboards and config
 ├── docker-compose.yml         # Service orchestration
+├── docker-compose.app.yml     # Application services orchestration
+├── docker-compose.infra.yml   # Infrastructure services orchestration
+├── build-services.sh          # Script to build all services
+├── deploy-services.sh         # Script to deploy to production server
 └── run-apple-silicon.sh       # Helper script for Apple Silicon Macs
 ```
 
@@ -115,6 +119,52 @@ cd services/data-visualizer
 npm install
 node server.js
 ```
+
+## Deployment
+
+RetailShift uses a streamlined deployment methodology with automated scripts to build and deploy the application to production environments.
+
+### Deployment Scripts
+
+The project includes several scripts to automate the build and deployment process:
+
+- **build-services.sh**: Builds all application services (Legacy Adapter, Inventory Service, Data Visualizer)
+  ```bash
+  # Run from project root
+  ./build-services.sh
+  ```
+
+- **deploy-services.sh**: Deploys all application services to the production server
+  ```bash
+  # Run from project root
+  ./deploy-services.sh
+  ```
+
+### Deployment Workflow
+
+1. **Build Stage**: Run `build-services.sh` to compile and package all services
+2. **Deploy Stage**: Run `deploy-services.sh` to:
+   - Copy packaged services to the production server
+   - Set up necessary directories
+   - Deploy using Docker Compose
+
+### Production Environment
+
+The production environment is hosted on a Digital Ocean droplet with the following configuration:
+- Nginx as a reverse proxy for all services
+- MongoDB for persistent data storage
+- Redis for caching and session management
+- Kafka for event streaming between services
+
+All services run in Docker containers orchestrated by Docker Compose, making the deployment process consistent and reproducible.
+
+### Monitoring Deployed Services
+
+After deployment, the services are available at:
+- Legacy Adapter: http://144.126.212.250:8081
+- Inventory Service: http://144.126.212.250:8082
+- Data Visualizer: http://144.126.212.250:8083
+- Main application: http://144.126.212.250
 
 ## Features
 
@@ -173,6 +223,13 @@ The customer insights dashboard provides detailed analytics on customer behavior
 - All services now support both x86_64 and ARM64 architectures
 - Added docker-compose configurations with proper platform settings
 - Updated JDK base images to Amazon Corretto for better ARM64 support
+
+### Frontend Reliability (April 2025)
+
+- Fixed error handling in components to prevent UI crashes
+- Implemented defensive coding techniques to handle undefined data
+- Enhanced logging for better troubleshooting of frontend issues
+- Improved responsiveness across different screen sizes
 
 ## License
 

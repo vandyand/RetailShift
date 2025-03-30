@@ -7,6 +7,9 @@
            [org.apache.kafka.common.serialization StringSerializer]
            [java.util Properties]))
 
+;; Define the Kafka producer atom
+(defonce ^:private producer-state (atom nil))
+
 (defn- create-producer-config
   "Create Kafka producer configuration"
   []
@@ -28,18 +31,19 @@
     (KafkaProducer. props)))
 
 (defstate kafka-producer
-  :start (create-producer)
-  :stop (when kafka-producer
+  :start (reset! producer-state (create-producer))
+  :stop (when-let [producer @producer-state]
           (log/info "Closing Kafka producer")
-          (.close kafka-producer)))
+          (.close producer)))
 
 (defn check-connection
   "Check if Kafka connection is healthy"
   []
   (try
-    (let [topic-name (config/get-in [:kafka :topics :events])]
+    (let [topic-name (config/get-in [:kafka :topics :events])
+          producer @producer-state]
       ;; Just try to get metadata, don't actually send
-      (.partitionsFor ^KafkaProducer kafka-producer topic-name)
+      (.partitionsFor ^KafkaProducer producer topic-name)
       true)
     (catch Exception e
       (log/error e "Kafka connection check failed")
@@ -57,12 +61,13 @@
   ([topic-key key message]
    (try
      (let [topic (get-topic topic-key)
+           producer @producer-state
            _ (log/debug "Sending message to topic" topic)
            message-str (json/generate-string message)
            record (if key
                     (ProducerRecord. topic key message-str)
                     (ProducerRecord. topic message-str))]
-       (.send ^KafkaProducer kafka-producer record)
+       (.send ^KafkaProducer producer record)
        true)
      (catch Exception e
        (log/error e "Failed to send message to Kafka")

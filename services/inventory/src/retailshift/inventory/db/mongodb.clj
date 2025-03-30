@@ -8,7 +8,11 @@
             [retailshift.inventory.config.core :as config]
             [mount.core :refer [defstate]]
             [clojure.string :as str]
-            [retailshift.inventory.models.product :as product]))
+            [retailshift.inventory.models.product :as product]
+            [cheshire.generate :as cheshire-gen])
+  (:import [com.mongodb BasicDBObject]
+           [org.bson.types ObjectId]
+           [com.mongodb MongoClientSettings ServerAddress MongoCredential]))
 
 ;; Collection names
 (def products-coll "products")
@@ -17,71 +21,94 @@
 (def purchase-orders-coll "purchase_orders")
 
 ;; Connection management
+(def ^:private db-connection (atom nil))
+
 (defn connect-to-db
   "Establish a connection to MongoDB"
   []
   (try
     (log/info "Connecting to MongoDB...")
-    (let [conn-str (config/get-config [:mongodb :uri])
+    (let [conn-str (or (config/get-config [:mongodb :uri])
+                       (let [host (System/getenv "SPRING_DATA_MONGODB_HOST")
+                             username (System/getenv "SPRING_DATA_MONGODB_USERNAME")
+                             password (System/getenv "SPRING_DATA_MONGODB_PASSWORD")
+                             database (System/getenv "SPRING_DATA_MONGODB_DATABASE")]
+                         (if (and host username password database)
+                           (format "mongodb://%s:%s@%s:27017/%s?authSource=admin" username password host database)
+                           "mongodb://retailshift_admin:secure_password@mongodb:27017/inventory?authSource=admin")))
+          _ (log/info "Using MongoDB connection string:"
+                      (str/replace conn-str #":[^:]*@" ":***@")) ;; Hide password in logs
           {:keys [conn db]} (mg/connect-via-uri conn-str)]
-      (log/info "Successfully connected to MongoDB")
-      {:conn conn :db db})
+      (log/info "Successfully connected to MongoDB" (str "(" (.getName db) ")"))
+      (let [connection {:conn conn :db db}]
+        (reset! db-connection connection)
+        connection))
     (catch Exception e
       (log/error e "Failed to connect to MongoDB")
-      (throw e))))
+      (reset! db-connection nil)
+      nil)))
 
 (defn disconnect
   "Close the MongoDB connection"
-  [conn]
-  (when conn
+  []
+  (when-let [conn (:conn @db-connection)]
     (try
       (log/info "Disconnecting from MongoDB")
       (mg/disconnect conn)
       (log/info "Successfully disconnected from MongoDB")
+      (reset! db-connection nil)
       (catch Exception e
         (log/error e "Error disconnecting from MongoDB")))))
-
-;; Database state management with mount
-(defstate db-connection
-  :start (connect-to-db)
-  :stop (disconnect (:conn db-connection)))
 
 ;; Helper functions
 (defn db []
   "Get the database from the current connection"
-  (:db db-connection))
+  (when-let [db (:db @db-connection)]
+    db))
 
 (defn conn []
   "Get the current connection"
-  (:conn db-connection))
+  (when-let [conn (:conn @db-connection)]
+    conn))
 
 ;; Create indexes to ensure performance
 (defn ensure-indexes []
   (try
     (log/info "Ensuring MongoDB indexes...")
-    ;; Product indexes
-    (mc/ensure-index (db) products-coll (array-map :sku 1) {:unique true})
-    (mc/ensure-index (db) products-coll (array-map :category 1) {})
-    (mc/ensure-index (db) products-coll (array-map :supplier-id 1) {})
-    (mc/ensure-index (db) products-coll (array-map :status 1) {})
+    (if-let [database (db)]
+      (do
+        (log/info "Creating MongoDB indexes...")
+        (try
+          ;; Product indexes
+          (mc/ensure-index database products-coll (array-map :sku 1) {:unique true})
+          (mc/ensure-index database products-coll (array-map :category 1) {})
+          (mc/ensure-index database products-coll (array-map :supplier-id 1) {})
+          (mc/ensure-index database products-coll (array-map :status 1) {})
 
-    ;; Location indexes
-    (mc/ensure-index (db) locations-coll (array-map :name 1) {:unique true})
-    (mc/ensure-index (db) locations-coll (array-map :type 1) {})
+          ;; Location indexes
+          (mc/ensure-index database locations-coll (array-map :name 1) {:unique true})
+          (mc/ensure-index database locations-coll (array-map :type 1) {})
 
-    ;; Inventory record indexes
-    (mc/ensure-index (db) inventory-records-coll
-                     (array-map :product-id 1 :location-id 1) {:unique true})
-    (mc/ensure-index (db) inventory-records-coll (array-map :status 1) {})
+          ;; Inventory record indexes
+          (mc/ensure-index database inventory-records-coll
+                           (array-map :product-id 1 :location-id 1) {:unique true})
+          (mc/ensure-index database inventory-records-coll (array-map :status 1) {})
 
-    ;; Purchase order indexes
-    (mc/ensure-index (db) purchase-orders-coll (array-map :supplier-id 1) {})
-    (mc/ensure-index (db) purchase-orders-coll (array-map :status 1) {})
-    (mc/ensure-index (db) purchase-orders-coll (array-map :order-date 1) {})
+          ;; Purchase order indexes
+          (mc/ensure-index database purchase-orders-coll (array-map :supplier-id 1) {})
+          (mc/ensure-index database purchase-orders-coll (array-map :status 1) {})
+          (mc/ensure-index database purchase-orders-coll (array-map :order-date 1) {})
 
-    (log/info "MongoDB indexes created successfully")
+          (log/info "MongoDB indexes created successfully")
+          (catch com.mongodb.MongoCommandException ce
+            (log/warn ce "Command error when creating MongoDB indexes"))
+          (catch com.mongodb.MongoSecurityException se
+            (log/warn se "Authentication error when creating MongoDB indexes"))
+          (catch Exception e
+            (log/error e "Failed to create MongoDB indexes"))))
+      (log/error "Cannot create MongoDB indexes: database connection is null"))
     (catch Exception e
-      (log/error e "Failed to create MongoDB indexes"))))
+      (log/error e "Failed to ensure MongoDB indexes"))))
 
 ;; Product CRUD operations
 (defn find-product-by-id
@@ -329,5 +356,22 @@
   "Initialize the database with necessary collections and indexes"
   []
   (log/info "Initializing MongoDB for the inventory service")
-  (ensure-indexes)
+  ;; Configure cheshire to encode ObjectId as string
+  (cheshire-gen/add-encoder ObjectId
+                            (fn [^ObjectId id jsonGenerator]
+                              (.writeString jsonGenerator (.toString id))))
+
+  (try
+    (let [connection-result (connect-to-db)]
+      (if connection-result
+        (do
+          (log/info "MongoDB connection established successfully")
+          (try
+            (ensure-indexes)
+            (catch Exception e
+              (log/warn e "Non-fatal error during index creation - service will continue"))))
+        (log/error "Failed to establish MongoDB connection - service may have limited functionality")))
+    (catch Exception e
+      (log/error e "Critical error during MongoDB initialization")
+      (log/warn "Service is starting with reduced functionality")))
   (log/info "MongoDB initialization complete")) 

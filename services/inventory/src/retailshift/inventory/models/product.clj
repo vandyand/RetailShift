@@ -175,4 +175,46 @@
     (<= quantity 0) "out-of-stock"
     (< quantity min-quantity) "low-stock"
     (> quantity max-quantity) "overstocked"
-    :else "in-stock")) 
+    :else "in-stock"))
+
+;; Convenience boolean validation functions
+(defn valid-product?
+  "Returns true if the product is valid, false otherwise"
+  [product]
+  (:valid (validate-product product)))
+
+(defn valid-inventory-location?
+  "Returns true if the inventory location is valid, false otherwise"
+  [location]
+  (:valid (validate-inventory-location location)))
+
+(defn valid-inventory-record?
+  "Returns true if the inventory record is valid, false otherwise"
+  [record]
+  (:valid (validate-inventory-record record)))
+
+(defn valid-purchase-order?
+  "Returns true if the purchase order is valid, false otherwise"
+  [order]
+  (:valid (validate-purchase-order order)))
+
+;; Functions to explain validation errors
+(defn explain-product
+  "Returns human-readable validation errors for a product"
+  [product]
+  (:errors (validate-product product)))
+
+(defn explain-inventory-location
+  "Returns human-readable validation errors for an inventory location"
+  [location]
+  (:errors (validate-inventory-location location)))
+
+(defn explain-inventory-record
+  "Returns human-readable validation errors for an inventory record"
+  [record]
+  (:errors (validate-inventory-record record)))
+
+(defn explain-purchase-order
+  "Returns human-readable validation errors for a purchase order"
+  [order]
+  (:errors (validate-purchase-order order))) 

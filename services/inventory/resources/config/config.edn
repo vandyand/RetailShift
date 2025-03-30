@@ -1,0 +1,11 @@
+{:service {:name "inventory-service"
+           :port 8082}
+ :mongodb {:uri "mongodb://mongodb:27017/inventory"}
+ :kafka {:bootstrap-servers "kafka:9092"
+         :consumer-group "inventory-service"
+         :producer-client-id "inventory-producer"
+         :topics {:inventory "inventory-updates"
+                  :transactions "transactions"
+                  :purchase-orders "purchase-orders"}}
+ :redis {:uri "redis://redis:6379"}
+ :logging {:level "info"}} 

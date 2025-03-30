@@ -5,6 +5,9 @@
             [clojure.tools.logging :as log]
             [mount.core :refer [defstate]]))
 
+;; Define config atom
+(defonce ^:private config-state (atom {}))
+
 (defn- deep-merge
   "Deep merge two maps"
   [& maps]
@@ -54,20 +57,20 @@
         env-vars-config (env-vars->config)]
     (deep-merge base-config env-config env-vars-config)))
 
-(defstate config
+(defstate app-config
   :start (do
            (log/info "Loading configuration")
-           (load-config)))
+           (reset! config-state (load-config))))
 
 (defn get-in
   "Get a value from config using a path of keys"
   [path & [default]]
-  (clojure.core/get-in config path default))
+  (clojure.core/get-in @config-state path default))
 
 (defn get-config
   "Get the entire config map"
   []
-  config)
+  @config-state)
 
 (comment
   ;; For REPL usage

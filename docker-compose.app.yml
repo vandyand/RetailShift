@@ -1,0 +1,81 @@
+services:
+  # Our legacy adapter service
+  legacy-adapter:
+    build:
+      context: ./services/legacy-adapter
+      dockerfile: Dockerfile
+    container_name: legacy-adapter
+    platform: linux/amd64
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_MONGODB_HOST=mongodb
+      - SPRING_DATA_MONGODB_USERNAME=retailshift_admin
+      - SPRING_DATA_MONGODB_PASSWORD=secure_password
+      - SPRING_DATA_MONGODB_DATABASE=legacy_adapter
+      - LEGACY_DB_URL=jdbc:h2:mem:legacydb
+      - LEGACY_DB_USERNAME=sa
+      - LEGACY_DB_PASSWORD=password
+    restart: unless-stopped
+    networks:
+      - retailshift_default
+
+  # Inventory service
+  inventory-service:
+    build:
+      context: ./services/inventory
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    platform: linux/amd64
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_MONGODB_HOST=mongodb
+      - SPRING_DATA_MONGODB_USERNAME=retailshift_admin
+      - SPRING_DATA_MONGODB_PASSWORD=secure_password
+      - SPRING_DATA_MONGODB_DATABASE=inventory
+      - SPRING_REDIS_HOST=redis
+    restart: unless-stopped
+    networks:
+      - retailshift_default
+
+  # Data Visualizer Backend - Handles real-time data processing
+  data-visualizer-backend:
+    build:
+      context: ./services/data-visualizer
+      dockerfile: Dockerfile.backend
+    container_name: data-visualizer-backend
+    platform: linux/amd64
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CONSUMER_GROUP=data-visualizer-group
+      - MONGODB_URI=mongodb://retailshift_admin:secure_password@mongodb:27017/visualization
+    restart: unless-stopped
+    networks:
+      - retailshift_default
+
+  # Data Visualizer Frontend - Provides the dynamic dashboard UI
+  data-visualizer-frontend:
+    build:
+      context: ./services/data-visualizer
+      dockerfile: Dockerfile.frontend
+    container_name: data-visualizer-frontend
+    platform: linux/amd64
+    ports:
+      - "8083:80"
+    restart: unless-stopped
+    depends_on:
+      - data-visualizer-backend
+    networks:
+      - retailshift_default
+
+networks:
+  retailshift_default:
+    external: true 
