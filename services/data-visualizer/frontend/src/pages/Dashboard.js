@@ -114,6 +114,75 @@ function Dashboard({ systemState, recentEvents }) {
     });
   };
 
+  // Extract event type and details from event
+  const getEventDetails = (event) => {
+    if (!event || !event.value) return { type: "Unknown", details: "" };
+
+    const value = event.value;
+    let type = "";
+    let details = "";
+
+    if (event.topic === "retailshift.inventory") {
+      type = value.action || "Inventory Update";
+      details = value.name
+        ? `${value.name}: ${value.quantity} units`
+        : value.productId
+        ? `Product ${value.productId}`
+        : "";
+    } else if (event.topic === "retailshift.transactions") {
+      type = "Transaction";
+      details = value.transactionId ? `ID: ${value.transactionId}` : "";
+      if (value.amount)
+        details += details
+          ? `, $${value.amount.toFixed(2)}`
+          : `$${value.amount.toFixed(2)}`;
+      if (value.items)
+        details += details ? `, ${value.items} items` : `${value.items} items`;
+    } else if (event.topic === "retailshift.customers") {
+      type = value.action || "Customer Event";
+      details = value.customerId ? `ID: ${value.customerId}` : "";
+      if (value.loyaltyLevel)
+        details += details ? `, ${value.loyaltyLevel}` : value.loyaltyLevel;
+    } else {
+      type = value.type || "System Event";
+      details = value.message || "";
+      if (value.service)
+        details += details ? ` (${value.service})` : value.service;
+    }
+
+    return { type, details };
+  };
+
+  // Get color for different event types
+  const getEventColor = (event) => {
+    if (!event) return theme.palette.text.primary;
+
+    if (event.topic === "retailshift.inventory") {
+      return theme.palette.info.main;
+    } else if (event.topic === "retailshift.transactions") {
+      return theme.palette.success.main;
+    } else if (event.topic === "retailshift.customers") {
+      return theme.palette.warning.main;
+    } else {
+      return theme.palette.secondary.main;
+    }
+  };
+
+  // Get background color for event items
+  const getEventBackgroundColor = (event) => {
+    if (!event) return "transparent";
+
+    if (event.topic === "retailshift.inventory") {
+      return theme.palette.info.light + "10"; // 10% transparency
+    } else if (event.topic === "retailshift.transactions") {
+      return theme.palette.success.light + "10";
+    } else if (event.topic === "retailshift.customers") {
+      return theme.palette.warning.light + "10";
+    } else {
+      return theme.palette.secondary.light + "10";
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
@@ -327,28 +396,44 @@ function Dashboard({ systemState, recentEvents }) {
                 {index > 0 && <Divider component="li" />}
                 <ListItem
                   className={index === 0 ? "new-event" : ""}
-                  sx={{ transition: "background-color 0.3s ease" }}
+                  sx={{
+                    transition: "background-color 0.3s ease",
+                    backgroundColor: getEventBackgroundColor(event),
+                    "&:hover": {
+                      backgroundColor: theme.palette.action.hover,
+                    },
+                  }}
                 >
-                  <ListItemText
-                    primary={
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
+                  <Grid container alignItems="center" spacing={1}>
+                    <Grid item xs={2}>
+                      <Typography
+                        variant="body1"
+                        fontWeight="medium"
+                        color={getEventColor(event)}
                       >
-                        <Typography variant="body2">{event.type}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatTime(event.timestamp)}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
+                        {getEventDetails(event).type}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={8}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block" }}
+                      >
                         {event.topic}
                       </Typography>
-                    }
-                  />
+                      {getEventDetails(event).details && (
+                        <Typography variant="body2" color="text.primary">
+                          {getEventDetails(event).details}
+                        </Typography>
+                      )}
+                    </Grid>
+                    <Grid item xs={2} textAlign="right">
+                      <Typography variant="caption" color="text.secondary">
+                        {formatTime(event.timestamp)}
+                      </Typography>
+                    </Grid>
+                  </Grid>
                 </ListItem>
               </React.Fragment>
             ))
